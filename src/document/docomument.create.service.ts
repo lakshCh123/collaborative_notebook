@@ -28,10 +28,10 @@ export class DocumentCreateService {
     const documentId = dto.uuid ?? randomUUID();
 
     return this.idempotencyService.executeIdempotently(
-      requestId,
-      documentId,
-      deviceId,
-      dto,
+  requestId,
+  null,
+  deviceId,
+  dto,
       async () => {
         const now = new Date().toISOString();
 

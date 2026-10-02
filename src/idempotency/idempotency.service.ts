@@ -93,10 +93,19 @@ export class IdempotencyService {
     try {
       const result = await operation();
 
+      const resultDocumentId =
+        result !== null &&
+        typeof result === 'object' &&
+        'id' in result &&
+        typeof result.id === 'string'
+          ? result.id
+          : documentId;
+
       const { error: updateError } =
         await this.databaseService.supabase
           .from('sync_requests')
           .update({
+            document_id: resultDocumentId,
             response: result,
             status: 'completed',
             processed_at: new Date().toISOString(),
