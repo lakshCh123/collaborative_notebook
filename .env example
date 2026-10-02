@@ -1,0 +1,7 @@
+SUPABASE_URL=https://your-project-id.supabase.co
+
+SUPABASE_SECRET_KEY=your_supabase_secret_key
+
+ADMIN_SECRET=your_long_random_admin_secret
+
+PORT=3000
