@@ -32,203 +32,203 @@ export class DocumentMergeService {
   ) {}
 
   async merge(
-  dto: UpdateDocumentDto,
-  requestId: string,
-  deviceId: string,
-) {
-  const documentId = dto.uuid;
+    dto: UpdateDocumentDto,
+    requestId: string,
+    deviceId: string,
+  ) {
+    const documentId = dto.uuid;
 
-  return this.idempotencyService.executeIdempotently(
-    requestId,
-    documentId,
-    deviceId,
-    dto,
-    async () => {
-      const { data: existingDocument, error: fetchError } =
-        await this.databaseService.supabase
-          .from('documents')
-          .select('*')
-          .eq('id', documentId)
-          .maybeSingle();
+    return this.idempotencyService.executeIdempotently(
+      requestId,
+      documentId,
+      deviceId,
+      dto,
+      async () => {
+        const { data: existingDocument, error: fetchError } =
+          await this.databaseService.supabase
+            .from('documents')
+            .select('*')
+            .eq('id', documentId)
+            .maybeSingle();
 
-      if (fetchError) {
-        throw new InternalServerErrorException(fetchError.message);
-      }
+        if (fetchError) {
+          this.logger.error(
+            `Failed to fetch document: ${fetchError.message}`,
+          );
 
-      if (!existingDocument) {
-        throw new NotFoundException(
-          `Notebook ${documentId} was not found`,
-        );
-      }
+          throw new InternalServerErrorException(
+            'Failed to fetch document',
+          );
+        }
 
-      const existingSubtitles =
-        (existingDocument.subtitles ?? {}) as NotebookSubtitles;
+        if (!existingDocument) {
+          throw new NotFoundException(
+            `Notebook ${documentId} was not found`,
+          );
+        }
 
-      const mergedSubtitles: NotebookSubtitles = {
-        ...existingSubtitles,
-      };
+        const existingSubtitles =
+          (existingDocument.subtitles ?? {}) as NotebookSubtitles;
 
-      const added: string[] = [];
-      const updated: string[] = [];
-      const unchanged: string[] = [];
-      const stale: string[] = [];
+        const mergedSubtitles: NotebookSubtitles = {
+          ...existingSubtitles,
+        };
 
-      const conflicts: Array<Record<string, unknown>> = [];
+        const added: string[] = [];
+        const updated: string[] = [];
+        const unchanged: string[] = [];
 
-      const now = new Date().toISOString();
+        const conflicts: Array<Record<string, unknown>> = [];
 
-      for (const incoming of dto.subtitles) {
-        const current = mergedSubtitles[incoming.id];
+        const now = new Date().toISOString();
 
-        // Case A: New subtitle.
-        if (!current) {
-          mergedSubtitles[incoming.id] = {
-            id: incoming.id,
-            title: incoming.title,
-            content: incoming.content,
-            created_at: now,
-            updated_at: now,
-            version: incoming.version,
-            last_modified_device_id: deviceId,
+        for (const incoming of dto.subtitles) {
+          const current = mergedSubtitles[incoming.id];
+
+          // Case A: New subtitle.
+          if (!current) {
+            mergedSubtitles[incoming.id] = {
+              id: incoming.id,
+              title: incoming.title,
+              content: incoming.content,
+              created_at: now,
+              updated_at: now,
+              version: 1,
+              last_modified_device_id: deviceId,
+            };
+
+            added.push(incoming.id);
+            continue;
+          }
+
+          // Case B: Incoming content already matches the server.
+          if (
+            incoming.title === current.title &&
+            incoming.content === current.content
+          ) {
+            unchanged.push(incoming.id);
+            continue;
+          }
+
+          // Case C: Client edited from the current server revision.
+          if (incoming.base_version === current.version) {
+            mergedSubtitles[incoming.id] = {
+              ...current,
+              title: incoming.title,
+              content: incoming.content,
+              version: current.version + 1,
+              updated_at: now,
+              last_modified_device_id: deviceId,
+            };
+
+            updated.push(incoming.id);
+            continue;
+          }
+
+          // Case D: Client edited from an older revision.
+          if (incoming.base_version < current.version) {
+            conflicts.push({
+              subtitleId: incoming.id,
+              reason: 'Concurrent edits detected',
+              version: current.version,
+              baseVersion: incoming.base_version,
+              existingContent: current.content,
+              incomingContent: incoming.content,
+              existingDeviceId:
+                current.last_modified_device_id ?? null,
+              incomingDeviceId: deviceId,
+            });
+
+            continue;
+          }
+
+          // Case E: Client claims a revision newer than the server has.
+          conflicts.push({
+            subtitleId: incoming.id,
+            reason: 'Invalid future base version',
+            version: current.version,
+            baseVersion: incoming.base_version,
+            incomingDeviceId: deviceId,
+          });
+        }
+
+        // Handle document title changes.
+        const nextTitle =
+          dto.title?.trim() || existingDocument.title;
+
+        const titleChanged =
+          nextTitle !== existingDocument.title;
+
+        const hasChanges =
+          added.length > 0 ||
+          updated.length > 0 ||
+          titleChanged;
+
+        if (!hasChanges) {
+          return {
+            message:
+              conflicts.length > 0
+                ? 'Merge completed with unresolved conflicts'
+                : 'No changes required',
+            documentId,
+            documentVersion: existingDocument.version,
+            deviceId,
+            added,
+            updated,
+            unchanged,
+            conflicts,
+            data: existingDocument,
           };
-
-          added.push(incoming.id);
-          continue;
         }
 
-        // Case B: Incoming version is newer.
-        if (incoming.version > current.version) {
-          mergedSubtitles[incoming.id] = {
-            ...current,
-            title: incoming.title,
-            content: incoming.content,
-            version: incoming.version,
-            updated_at: now,
-            last_modified_device_id: deviceId,
-          };
+        // Increment notebook version once for this successful merge.
+        const nextDocumentVersion =
+          (existingDocument.version ?? 1) + 1;
 
-          updated.push(incoming.id);
-          continue;
+        // Atomically update the document and insert its history snapshot.
+        const { data: updatedDocument, error: saveError } =
+          await this.databaseService.supabase.rpc(
+            'update_document_with_history',
+            {
+              p_document_id: documentId,
+              p_expected_version: existingDocument.version,
+              p_title: nextTitle,
+              p_subtitles: mergedSubtitles,
+              p_updated_at: now,
+            },
+          );
+
+        if (saveError) {
+          if (saveError.code === '40001') {
+            throw new ConflictException(
+              'Document was modified by another request. Fetch the latest version and retry.',
+            );
+          }
+
+          this.logger.error(
+            `Failed to save document and history: ${saveError.message}`,
+          );
+
+          throw new InternalServerErrorException(
+            'Failed to save document and version history',
+          );
         }
 
-        // Case C: Incoming version is older.
-        if (incoming.version < current.version) {
-          stale.push(incoming.id);
-          continue;
-        }
-
-        // Case D: Equal versions and identical content.
-        if (
-          incoming.content === current.content &&
-          incoming.title === current.title
-        ) {
-          unchanged.push(incoming.id);
-          continue;
-        }
-
-        // Case E: Equal versions but different content.
-        conflicts.push({
-          subtitleId: incoming.id,
-          reason: 'Concurrent edits detected',
-          version: current.version,
-          existingContent: current.content,
-          incomingContent: incoming.content,
-          existingDeviceId: current.last_modified_device_id ?? null,
-          incomingDeviceId: deviceId,
-        });
-      }
-
-      // Handle document title changes.
-      const nextTitle =
-        dto.title?.trim() || existingDocument.title;
-
-      const titleChanged =
-        nextTitle !== existingDocument.title;
-
-      const hasChanges =
-        added.length > 0 ||
-        updated.length > 0 ||
-        titleChanged;
-
-      if (!hasChanges) {
         return {
           message:
             conflicts.length > 0
               ? 'Merge completed with unresolved conflicts'
-              : 'No changes required',
+              : 'Merge completed successfully',
           documentId,
-          documentVersion: existingDocument.version,
+          documentVersion: nextDocumentVersion,
           deviceId,
           added,
           updated,
           unchanged,
-          stale,
           conflicts,
-          data: existingDocument,
+          data: updatedDocument,
         };
-      }
-
-      const nextDocumentVersion =
-        (existingDocument.version ?? 1) + 1;
-
-      // Optimistic concurrency control.
-      const { data: updatedDocument, error: updateError } =
-        await this.databaseService.supabase
-          .from('documents')
-          .update({
-            title: nextTitle,
-            subtitles: mergedSubtitles,
-            version: nextDocumentVersion,
-            updated_at: now,
-          })
-          .eq('id', documentId)
-          .eq('version', existingDocument.version)
-          .select()
-          .maybeSingle();
-
-      if (updateError) {
-        throw new InternalServerErrorException(updateError.message);
-      }
-
-      if (!updatedDocument) {
-        throw new ConflictException(
-          'Document was modified by another request. Fetch the latest version and retry.',
-        );
-      }
-
-      // Save complete notebook snapshot.
-      const { error: historyError } =
-        await this.databaseService.supabase
-          .from('document_versions')
-          .insert({
-            document_id: documentId,
-            version_number: nextDocumentVersion,
-            title: nextTitle,
-            subtitles: mergedSubtitles,
-          });
-
-      if (historyError) {
-        throw new InternalServerErrorException(
-          historyError.message,
-        );
-      }
-
-      return {
-        message:
-          conflicts.length > 0
-            ? 'Merge completed with unresolved conflicts'
-            : 'Merge completed successfully',
-        documentId,
-        documentVersion: nextDocumentVersion,
-        deviceId,
-        added,
-        updated,
-        unchanged,
-        stale,
-        conflicts,
-        data: updatedDocument,
-      };
-    },
-  );
-}
+      },
+    );
+  }
 }

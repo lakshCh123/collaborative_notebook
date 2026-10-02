@@ -33,6 +33,11 @@ export class SubtitleDto {
   @IsInt()
   @Min(1)
   version?: number;
+   
+  
+  @IsInt()
+  @Min(1)
+  base_version : number;
 }
 
 export class CreateDocumentDto {
