@@ -5,6 +5,7 @@ import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { DocumentModule } from './document/document.module.js';
+import { IdempotencyModule } from './idempotency/idempotency.module.js';
 
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
@@ -23,6 +24,8 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     }),
 
     DocumentModule,
+
+    IdempotencyModule,
     
     
   ],

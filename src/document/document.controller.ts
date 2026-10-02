@@ -36,24 +36,33 @@ export class DocumentController {
   }
 
   @Post()
-  async create(
-    @Body() dto: CreateDocumentDto,
-    @Headers('idempotency-key') requestId: string,
-  ) {
-    this.validateRequestId(requestId);
+async create(
+  @Body() dto: CreateDocumentDto,
+  @Headers('idempotency-key') requestId: string,
+  @Headers('x-device-id') deviceId: string,
+) {
+  this.validateRequestId(requestId);
 
-    return this.documentCreateService.create(dto, requestId);
-  }
-
+  return this.documentCreateService.create(
+    dto,
+    requestId,
+    deviceId,
+  );
+}
   @Put()
-  async merge(
-    @Body() dto: UpdateDocumentDto,
-    @Headers('idempotency-key') requestId: string,
-  ) {
-    this.validateRequestId(requestId);
+async merge(
+  @Body() dto: UpdateDocumentDto,
+  @Headers('idempotency-key') requestId: string,
+  @Headers('x-device-id') deviceId: string,
+) {
+  this.validateRequestId(requestId);
 
-    return this.documentMergeService.merge(dto, requestId);
-  }
+  return this.documentMergeService.merge(
+  dto,
+  requestId,
+  deviceId,
+);
+}
 
   @Get(':documentId/versions')
   async getDocumentVersions(

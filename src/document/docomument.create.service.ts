@@ -5,12 +5,11 @@ import {
   Logger,
 } from '@nestjs/common';
 
-import { randomUUID, createHash } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 import { DatabaseService } from '../database/database.service.js';
 import { CreateDocumentDto } from '../dto/create_document.dto.js';
-
-const MAX_MERGE_ATTEMPTS = 3;
+import { IdempotencyService } from '../idempotency/idempotency.service.js';
 
 @Injectable()
 export class DocumentCreateService {
@@ -18,109 +17,20 @@ export class DocumentCreateService {
 
   constructor(
     private readonly databaseService: DatabaseService,
+    private readonly idempotencyService: IdempotencyService,
   ) {}
-
-  private generateRequestHash(payload: unknown): string {
-    return createHash('sha256')
-      .update(JSON.stringify(payload))
-      .digest('hex');
-  }
-
-  private async executeIdempotently<T>(
-    requestId: string,
-    documentId: string | null,
-    payload: unknown,
-    operation: () => Promise<T>,
-  ): Promise<T> {
-    const requestHash = this.generateRequestHash(payload);
-
-    const { data: existingRequest, error: searchError } =
-      await this.databaseService.supabase
-        .from('sync_requests')
-        .select('*')
-        .eq('request_id', requestId)
-        .maybeSingle();
-
-    if (searchError) {
-      throw new InternalServerErrorException(searchError.message);
-    }
-
-    if (existingRequest) {
-      if (existingRequest.request_hash !== requestHash) {
-        throw new ConflictException(
-          'Idempotency key reused with a different request body',
-        );
-      }
-
-      if (
-        existingRequest.status === 'completed' &&
-        existingRequest.response !== null
-      ) {
-        return existingRequest.response as T;
-      }
-
-      throw new ConflictException(
-        'This request is already being processed or has not completed',
-      );
-    }
-
-    const { error: insertError } =
-      await this.databaseService.supabase
-        .from('sync_requests')
-        .insert({
-          request_id: requestId,
-          document_id: documentId,
-          request_hash: requestHash,
-          status: 'processing',
-        });
-
-    if (insertError) {
-      if (insertError.code === '23505') {
-        throw new ConflictException(
-          'This request is already being processed',
-        );
-      }
-
-      throw new InternalServerErrorException(insertError.message);
-    }
-
-    try {
-      const result = await operation();
-
-      const { error: updateError } =
-        await this.databaseService.supabase
-          .from('sync_requests')
-          .update({
-            response: result,
-            status: 'completed',
-            processed_at: new Date().toISOString(),
-          })
-          .eq('request_id', requestId);
-
-      if (updateError) {
-        throw new InternalServerErrorException(updateError.message);
-      }
-
-      return result;
-    } catch (error) {
-      await this.databaseService.supabase
-        .from('sync_requests')
-        .update({ status: 'failed' })
-        .eq('request_id', requestId);
-
-      throw error;
-    }
-  }
 
   async create(
     dto: CreateDocumentDto,
     requestId: string,
+    deviceId: string,
   ) {
     const documentId = dto.uuid ?? randomUUID();
 
-    return this.executeIdempotently(
+    return this.idempotencyService.executeIdempotently(
       requestId,
       documentId,
+      deviceId,
       dto,
       async () => {
         const now = new Date().toISOString();
@@ -138,6 +48,7 @@ export class DocumentCreateService {
                 created_at: subtitle.created_at ?? now,
                 updated_at: subtitle.updated_at ?? now,
                 version: subtitle.version ?? 1,
+                last_modified_device_id: deviceId,
               },
             ];
           }),
@@ -151,7 +62,7 @@ export class DocumentCreateService {
               title: dto.title.trim(),
               subtitles,
               version: 1,
-              device_id: dto.deviceId ?? null,
+              device_id: deviceId,
               created_at: now,
               updated_at: now,
             })
