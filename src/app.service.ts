@@ -3,6 +3,17 @@ import { Injectable } from '@nestjs/common';
 @Injectable()
 export class AppService {
   getHello(): string {
-    return 'kam kr rha hai';
+    return `
+      <html>
+        <body>
+          <h1>kam kr rha hai</h1>
+          <img 
+            src="/images/shrek.jpg" 
+            alt="Shrek"
+            width="400"
+          />
+        </body>
+      </html>
+    `;
   }
 }

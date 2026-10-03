@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ServeStaticModule } from '@nestjs/serve-static';
 import { createObserveModule } from '@nestjs/observe';
+import { join } from 'path';
 
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { DocumentModule } from './document/document.module.js';
 import { IdempotencyModule } from './idempotency/idempotency.module.js';
-
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -15,6 +16,10 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+    }),
+
+    ServeStaticModule.forRoot({
+      rootPath: join(import.meta.dirname, '..', 'public'),
     }),
 
     ObserveModule.forRoot({
@@ -26,8 +31,6 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     DocumentModule,
 
     IdempotencyModule,
-    
-    
   ],
   controllers: [AppController],
   providers: [AppService],
