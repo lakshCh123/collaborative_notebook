@@ -22,6 +22,11 @@ interface StoredSubtitle {
 
 type NotebookSubtitles = Record<string, StoredSubtitle>;
 
+type MergeStatus =
+  | 'merged'
+  | 'conflict'
+  | 'unchanged';
+
 @Injectable()
 export class DocumentMergeService {
   private readonly logger = new Logger(DocumentMergeService.name);
@@ -81,186 +86,262 @@ export class DocumentMergeService {
         const conflicts: Array<Record<string, unknown>> = [];
 
         const now = new Date().toISOString();
-       if (dto.base_title !== existingDocument.title) {
-       throw new ConflictException(
-       'The document title was changed by another device. Fetch the latest title before updating.',
-       );
-        }
+
         for (const incoming of dto.subtitles) {
-  const current = mergedSubtitles[incoming.id];
+          const current = mergedSubtitles[incoming.id];
 
-  // Case A: New subtitle.
-  if (!current) {
-    mergedSubtitles[incoming.id] = {
-      id: incoming.id,
-      title: incoming.title,
-      content: incoming.content,
-      created_at: now,
-      updated_at: now,
-      version: 1,
-      last_modified_device_id: deviceId,
-    };
+          // ----------------------------------------
+          // CASE 1: New subtitle
+          // ----------------------------------------
 
-    added.push(incoming.id);
-    continue;
-  }
+          if (!current) {
+            mergedSubtitles[incoming.id] = {
+              id: incoming.id,
+              title: incoming.title,
+              content: incoming.content,
+              created_at: now,
+              updated_at: now,
+              version: 1,
+              last_modified_device_id: deviceId,
+            };
 
-  // Existing subtitles need the original values used by the client.
-  if (
-    incoming.base_title === undefined ||
-    incoming.base_content === undefined
-  ) {
-    conflicts.push({
-      subtitleId: incoming.id,
-      reason: 'Missing base values for field-level merge',
-      currentVersion: current.version,
-      baseVersion: incoming.base_version,
-      incomingDeviceId: deviceId,
-    });
+            added.push(incoming.id);
 
-    continue;
-  }
+            continue;
+          }
 
-  // A client cannot base an edit on a revision newer than the server.
-  if (incoming.base_version > current.version) {
-    conflicts.push({
-      subtitleId: incoming.id,
-      reason: 'Invalid future base version',
-      currentVersion: current.version,
-      baseVersion: incoming.base_version,
-      incomingDeviceId: deviceId,
-    });
+          // ----------------------------------------
+          // CASE 2: Missing base information
+          // ----------------------------------------
 
-    continue;
-  }
+          if (
+            incoming.base_title === undefined ||
+            incoming.base_content === undefined
+          ) {
+            conflicts.push({
+              subtitleId: incoming.id,
+              reason: 'Missing base values for field-level merge',
+              currentVersion: current.version,
+              baseVersion: incoming.base_version,
+              incomingDeviceId: deviceId,
+            });
 
-  const clientChangedTitle =
-    incoming.title !== incoming.base_title;
+            continue;
+          }
 
-  const clientChangedContent =
-    incoming.content !== incoming.base_content;
+          // ----------------------------------------
+          // CASE 3: Future base version
+          // ----------------------------------------
 
-  const serverChangedTitle =
-    current.title !== incoming.base_title;
+          if (incoming.base_version > current.version) {
+            conflicts.push({
+              subtitleId: incoming.id,
+              reason: 'Invalid future base version',
+              currentVersion: current.version,
+              baseVersion: incoming.base_version,
+              incomingDeviceId: deviceId,
+            });
 
-  const serverChangedContent =
-    current.content !== incoming.base_content;
+            continue;
+          }
 
-  let nextTitle = current.title;
-  let nextContent = current.content;
+          // ----------------------------------------
+          // Detect client changes
+          // ----------------------------------------
 
-  const fieldConflicts: Array<Record<string, unknown>> = [];
+          const clientChangedTitle =
+            incoming.title !== incoming.base_title;
 
-  // Merge title independently.
-  if (clientChangedTitle) {
-    if (
-      !serverChangedTitle ||
-      incoming.title === current.title
-    ) {
-      nextTitle = incoming.title;
-    } else {
-      fieldConflicts.push({
-        field: 'title',
-        baseValue: incoming.base_title,
-        currentValue: current.title,
-        incomingValue: incoming.title,
-      });
-    }
-  }
+          const clientChangedContent =
+            incoming.content !== incoming.base_content;
 
-  // Merge content independently.
-  if (clientChangedContent) {
-    if (
-      !serverChangedContent ||
-      incoming.content === current.content
-    ) {
-      nextContent = incoming.content;
-    } else {
-      fieldConflicts.push({
-        field: 'content',
-        baseValue: incoming.base_content,
-        currentValue: current.content,
-        incomingValue: incoming.content,
-      });
-    }
-  }
+          // ----------------------------------------
+          // Detect server changes
+          // ----------------------------------------
 
-  if (fieldConflicts.length > 0) {
-    conflicts.push({
-      subtitleId: incoming.id,
-      reason: 'Concurrent edits to the same field',
-      currentVersion: current.version,
-      baseVersion: incoming.base_version,
-      fields: fieldConflicts,
-      existingDeviceId: current.last_modified_device_id ?? null,
-      incomingDeviceId: deviceId,
-    });
-  }
+          const serverChangedTitle =
+            current.title !== incoming.base_title;
 
-  const subtitleChanged =
-    nextTitle !== current.title ||
-    nextContent !== current.content;
+          const serverChangedContent =
+            current.content !== incoming.base_content;
 
-  if (!subtitleChanged) {
-    if (fieldConflicts.length === 0) {
-      unchanged.push(incoming.id);
-    }
+          let nextTitle = current.title;
+          let nextContent = current.content;
 
-    continue;
-  }
+          const fieldConflicts: Array<Record<string, unknown>> = [];
 
-  mergedSubtitles[incoming.id] = {
-    ...current,
-    title: nextTitle,
-    content: nextContent,
-    version: current.version + 1,
-    updated_at: now,
-    last_modified_device_id: deviceId,
-  };
+          // ----------------------------------------
+          // TITLE MERGE
+          // ----------------------------------------
 
-  updated.push(incoming.id);
-}
+          if (clientChangedTitle) {
+            if (
+              !serverChangedTitle ||
+              incoming.title === current.title
+            ) {
+              nextTitle = incoming.title;
+            } else {
+              fieldConflicts.push({
+                field: 'title',
+                baseValue: incoming.base_title,
+                currentValue: current.title,
+                incomingValue: incoming.title,
+                resolution: 'server_value_preserved',
+              });
+            }
+          }
 
-        // Handle document title changes.
+          // ----------------------------------------
+          // CONTENT MERGE
+          // ----------------------------------------
+
+          if (clientChangedContent) {
+            if (
+              !serverChangedContent ||
+              incoming.content === current.content
+            ) {
+              nextContent = incoming.content;
+            } else {
+              fieldConflicts.push({
+                field: 'content',
+                baseValue: incoming.base_content,
+                currentValue: current.content,
+                incomingValue: incoming.content,
+                resolution: 'server_value_preserved',
+              });
+            }
+          }
+
+          // ----------------------------------------
+          // Record conflicts
+          // ----------------------------------------
+
+          if (fieldConflicts.length > 0) {
+            conflicts.push({
+              subtitleId: incoming.id,
+              reason: 'Concurrent edits to the same field',
+              currentVersion: current.version,
+              baseVersion: incoming.base_version,
+              fields: fieldConflicts,
+              existingDeviceId:
+                current.last_modified_device_id ?? null,
+              incomingDeviceId: deviceId,
+            });
+          }
+
+          // ----------------------------------------
+          // Check whether anything actually changed
+          // ----------------------------------------
+
+          const subtitleChanged =
+            nextTitle !== current.title ||
+            nextContent !== current.content;
+
+          if (!subtitleChanged) {
+            if (fieldConflicts.length === 0) {
+              unchanged.push(incoming.id);
+            }
+
+            continue;
+          }
+
+          // ----------------------------------------
+          // Save merged subtitle in memory
+          // ----------------------------------------
+
+          mergedSubtitles[incoming.id] = {
+            ...current,
+            title: nextTitle,
+            content: nextContent,
+            version: current.version + 1,
+            updated_at: now,
+            last_modified_device_id: deviceId,
+          };
+
+          updated.push(incoming.id);
+        }
+
+        // ----------------------------------------
+        // Document title
+        // ----------------------------------------
+
         const nextTitle =
           dto.title?.trim() || existingDocument.title;
 
         const titleChanged =
           nextTitle !== existingDocument.title;
 
+        // ----------------------------------------
+        // Determine whether anything changed
+        // ----------------------------------------
+
         const hasChanges =
           added.length > 0 ||
           updated.length > 0 ||
           titleChanged;
 
+        // ----------------------------------------
+        // Nothing changed
+        // ----------------------------------------
+
         if (!hasChanges) {
+          const status: MergeStatus =
+            conflicts.length > 0
+              ? 'conflict'
+              : 'unchanged';
+
           return {
             message:
-              conflicts.length > 0
-                ? 'Merge completed with unresolved conflicts'
+              status === 'conflict'
+                ? 'Merge completed with conflicts'
                 : 'No changes required',
+
+            status,
+
             documentId,
-            documentVersion: existingDocument.version,
+
+            documentVersion:
+              existingDocument.version,
+
             deviceId,
+
+            summary: {
+              added: added.length,
+              updated: updated.length,
+              unchanged: unchanged.length,
+              conflicts: conflicts.length,
+            },
+
             added,
             updated,
             unchanged,
             conflicts,
+
             data: existingDocument,
           };
         }
 
-        // Increment notebook version once for this successful merge.
+        // ----------------------------------------
+        // Calculate next document version
+        // ----------------------------------------
+
         const nextDocumentVersion =
           (existingDocument.version ?? 1) + 1;
 
-        // Atomically update the document and insert its history snapshot.
-        const { data: updatedDocument, error: saveError } =
+        // ----------------------------------------
+        // Atomically update document + history
+        // ----------------------------------------
+
+        const {
+          data: updatedDocument,
+          error: saveError,
+        } =
           await this.databaseService.supabase.rpc(
             'update_document_with_history',
             {
               p_document_id: documentId,
-              p_expected_version: existingDocument.version,
+              p_expected_version:
+                existingDocument.version,
               p_title: nextTitle,
               p_subtitles: mergedSubtitles,
               p_updated_at: now,
@@ -283,18 +364,46 @@ export class DocumentMergeService {
           );
         }
 
+        // ----------------------------------------
+        // Determine final merge status
+        // ----------------------------------------
+
+        const status: MergeStatus =
+          conflicts.length > 0
+            ? 'conflict'
+            : 'merged';
+
+        // ----------------------------------------
+        // Return explicit merge result
+        // ----------------------------------------
+
         return {
           message:
-            conflicts.length > 0
-              ? 'Merge completed with unresolved conflicts'
+            status === 'conflict'
+              ? 'Merge completed with conflicts'
               : 'Merge completed successfully',
+
+          status,
+
           documentId,
-          documentVersion: nextDocumentVersion,
+
+          documentVersion:
+            nextDocumentVersion,
+
           deviceId,
+
+          summary: {
+            added: added.length,
+            updated: updated.length,
+            unchanged: unchanged.length,
+            conflicts: conflicts.length,
+          },
+
           added,
           updated,
           unchanged,
           conflicts,
+
           data: updatedDocument,
         };
       },
