@@ -176,7 +176,7 @@ The phone starts from the original `Intro / v1` state while the laptop already h
 
 ![Two-device conflict](docs/screenshots/10-two-device-conflict.png)
 
-> This image is a generated Swagger-style preview from the exact test in [`docs/swagger-steps.md`](docs/swagger-steps.md). Run the request in Swagger UI to capture a live screenshot.
+
 
 ### Step 10: Two devices edit different fields (merge)
 
@@ -184,7 +184,7 @@ The phone changes the notebook title while its subtitle values remain at their o
 
 ![Two-device merge](docs/screenshots/11-two-device-merge.png)
 
-> This image is a generated Swagger-style preview from the exact test in [`docs/swagger-steps.md`](docs/swagger-steps.md). Run the request in Swagger UI to capture a live screenshot.
+
 
 ---
 
