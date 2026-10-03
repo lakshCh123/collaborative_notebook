@@ -30,16 +30,161 @@ Built for **GDG on Campus SRM Recruitments 2026-27, Backend Task 2: "Offline Syn
 
 ## 1. Screenshots
 
-> Add your images to `docs/screenshots/` using these names. The GDG brief requires screenshots in the repository.
+All images are in [`docs/screenshots/`](docs/screenshots/). The Swagger overview images below were supplied from the running Swagger UI (`http://localhost:3000/api`). The two-device conflict/merge images are generated Swagger-style documentation previews based on the exact requests and expected responses in [`docs/swagger-steps.md`](docs/swagger-steps.md).
 
-| Step | Screenshot |
+| Value | Used in this run |
 |---|---|
-| Swagger UI at `/api` | ![Swagger UI](docs/screenshots/01-swagger.png) |
-| Create a notebook | ![Create](docs/screenshots/02-create.png) |
-| Clean merge of two devices | ![Merge](docs/screenshots/03-merge.png) |
-| Field conflict returned to the client | ![Conflict](docs/screenshots/04-conflict.png) |
-| Duplicate request replayed | ![Replay](docs/screenshots/05-replay.png) |
-| Version history | ![History](docs/screenshots/06-history.png) |
+| Notebook id | `27876e54-2ff3-4bd7-9878-29a434e5993d` |
+| Subtitle id | `952f9fe8-f304-4a5b-a452-1ae4883dfcb8` |
+| Primary run device | `laptop-01` (the two-device examples additionally use `phone-01`) |
+
+### Step 0: Swagger UI
+
+The API is exposed through Swagger/OpenAPI at `http://localhost:3000/api`.
+
+![Swagger UI overview](docs/screenshots/01-swagger.png)
+
+The history endpoint is documented with its required `documentId` path parameter:
+
+![Swagger history endpoint](docs/screenshots/01-swagger-history.png)
+
+Swagger also exposes the response/status-code documentation:
+
+![Swagger response documentation](docs/screenshots/01-swagger-responses-schemas.png)
+
+The generated DTO schemas show the create and update request shapes used by the API:
+
+![Swagger DTO schemas](docs/screenshots/01-swagger-schemas.png)
+
+### Step 1: Create a notebook (`POST /documents` returns `201`)
+
+Request with `idempotency-key` and `x-device-id: laptop-01`:
+
+![Create request](docs/screenshots/02a-create-request.png)
+
+Curl and the start of the `201` response:
+
+![Create curl](docs/screenshots/02b-create-curl-and-201.png)
+
+Full response. The server generated the notebook id and the subtitle id, set both versions to `1` and stored `laptop-01` as the device:
+
+![Create response](docs/screenshots/02c-create-response.png)
+
+### Step 2: Clean update (`PUT /documents` returns `200`)
+
+The laptop renames the subtitle `Intro` to `Overview`. Headers (new `idempotency-key`, same device):
+
+![Rename headers](docs/screenshots/03a-rename-headers.png)
+
+Body. `base_title: Intro` and `base_content: v1` tell the server which state the edit started from:
+
+![Rename body](docs/screenshots/03b-rename-body.png)
+
+Curl sent:
+
+![Rename curl](docs/screenshots/03c-rename-curl.png)
+
+Response: `Merge completed successfully`, `documentVersion` is `2`, the subtitle id is in `updated`, and both conflict lists are empty. The subtitle title is now `Overview` with subtitle `version` 2:
+
+![Rename response](docs/screenshots/03d-rename-response.png)
+
+### Step 3: Read the current notebook (`GET /documents/:documentId` returns `200`)
+
+![Get request](docs/screenshots/04a-get-request.png)
+
+The stored state matches the merge result: title `Overview`, notebook `version` 2:
+
+![Get response](docs/screenshots/04b-get-response.png)
+
+![Get headers and status codes](docs/screenshots/04c-get-headers.png)
+
+### Step 4: Version history (`GET /documents/:documentId/versions` returns `200`)
+
+![History request](docs/screenshots/05a-history-request.png)
+
+`totalVersions` is `2`, newest first. Version 2 holds the renamed subtitle:
+
+![History v2](docs/screenshots/05b-history-response-v2.png)
+
+Version 1 still holds the original `Intro`, so nothing was lost by the update:
+
+![History v1](docs/screenshots/05c-history-response-v1.png)
+
+![History headers and status codes](docs/screenshots/05d-history-headers.png)
+
+> The GET and history screenshots were taken right after Step 2, so they show notebook version 2. Steps 5 to 7 and the resolve and add examples in [section 12](#12-example-requests-and-responses) take the notebook to version 5.
+
+### Step 5: Change already applied (`PUT /documents` returns `200`, `No changes required`)
+
+The laptop sends the Step 2 rename again under a **new** `idempotency-key`, as a client would after losing the first response. The server compares values, sees the subtitle is already `Overview`, and applies nothing: the id is listed under `unchanged` and `documentVersion` stays `2`.
+
+![No-change headers and body](docs/screenshots/06a-nochange-headers.png)
+
+![No-change curl](docs/screenshots/06b-nochange-curl.png)
+
+![No-change response](docs/screenshots/06c-nochange-response.png)
+
+![No-change response end](docs/screenshots/06d-nochange-response-end.png)
+
+### Step 6: Content edit with an outdated `base_version` (`PUT /documents` returns `200`)
+
+The laptop edits the subtitle content to `v2 from laptop`. It sends `base_version: 1` while the subtitle is already at version 2, but its `base_title` and `base_content` match what the server holds, so the edit is accepted. Being out of date is not a conflict; only differing values are. Result: `documentVersion` `3`, subtitle `version` `3`, content `v2 from laptop`.
+
+![Update headers](docs/screenshots/07a-update-headers.png)
+
+![Update body](docs/screenshots/07b-update-body.png)
+
+![Update curl](docs/screenshots/07c-update-curl.png)
+
+![Update response](docs/screenshots/07d-update-response.png)
+
+![Update status codes](docs/screenshots/07e-update-status-codes.png)
+
+### Step 7: Duplicate request replayed (`PUT /documents` returns `200`)
+
+The Step 6 request is sent again with the **same** `idempotency-key` and the same body. The response is `Same request already processed`, the original response is returned inside `data`, and the notebook stays at version 3. Nothing is applied twice.
+
+![Replay headers](docs/screenshots/08a-replay-headers.png)
+
+![Replay body and curl](docs/screenshots/08b-replay-body-curl.png)
+
+![Replay response](docs/screenshots/08c-replay-response.png)
+
+![Replay headers and status codes](docs/screenshots/08d-replay-headers-status.png)
+
+### Step 8: Stale base returns a conflict (`PUT /documents` returns `200`)
+
+The laptop sends content `v2 from phone + v2 from laptop` with `base_content: v2 from phone`, but the server holds `v2 from laptop`. Incoming, base and current all differ, so the server keeps its own value, reports a conflict and saves nothing: the stored content is still `v2 from laptop`, `updated_at` is unchanged and the notebook is still at version 3. This run used a single device, so `existingDeviceId` and `incomingDeviceId` are both `laptop-01`. (`v2 from phone` is a base this notebook never held; the normal resolve flow in [section 12.5](#125-resolving-the-conflict) uses the server's `currentValue` as the base.)
+
+![Stale base headers](docs/screenshots/09a-stale-base-headers.png)
+
+![Stale base body](docs/screenshots/09b-stale-base-body.png)
+
+![Stale base curl](docs/screenshots/09c-stale-base-curl.png)
+
+The screenshot below is scrolled to the end of the response: the conflict entry's device ids, an empty `documentConflicts`, and the unchanged stored notebook.
+
+![Stale base response](docs/screenshots/09d-stale-base-response.png)
+
+![Stale base headers and status codes](docs/screenshots/09e-stale-base-headers-status.png)
+
+> Steps 3 and 4 were captured right after Step 2, so they show notebook version 2. Steps 6 to 8 then move the notebook to version 3.
+
+### Step 9: Two devices edit the same field (conflict with `phone-01`)
+
+The phone starts from the original `Intro / v1` state while the laptop already holds `Overview / v2 from laptop`. Both devices changed the same `content` field, so the server returns the three-way conflict instead of overwriting the laptop value.
+
+![Two-device conflict](docs/screenshots/10-two-device-conflict.png)
+
+> This image is a generated Swagger-style preview from the exact test in [`docs/swagger-steps.md`](docs/swagger-steps.md). Run the request in Swagger UI to capture a live screenshot.
+
+### Step 10: Two devices edit different fields (merge)
+
+The phone changes the notebook title while its subtitle values remain at their original base. The server applies the title change while preserving the laptop's subtitle edit.
+
+![Two-device merge](docs/screenshots/11-two-device-merge.png)
+
+> This image is a generated Swagger-style preview from the exact test in [`docs/swagger-steps.md`](docs/swagger-steps.md). Run the request in Swagger UI to capture a live screenshot.
 
 ---
 
@@ -92,12 +237,12 @@ A stored subtitle looks like this:
 
 ```json
 {
-  "id": "5d0f3c0a-6b1e-4a52-9a43-0c6f5b7a1e21",
+  "id": "952f9fe8-f304-4a5b-a452-1ae4883dfcb8",
   "title": "Intro",
   "content": "v1",
   "version": 1,
-  "created_at": "2026-10-03T10:00:00.000Z",
-  "updated_at": "2026-10-03T10:00:00.000Z",
+  "created_at": "2026-10-03T13:26:23.013Z",
+  "updated_at": "2026-10-03T13:26:23.013Z",
   "last_modified_device_id": "laptop-01"
 }
 ```
@@ -295,7 +440,7 @@ The server generates the notebook id and the subtitle ids. Read them from the re
 
 ## 12. Example requests and responses
 
-Examples 12.1 to 12.5 follow one notebook. Replace `localhost:3000` and the ids as needed. The `data` field is shortened for readability.
+Examples 12.1 to 12.5 and 12.7 follow one notebook. The ids and timestamps are from a real run (see [section 1](#1-screenshots)); 12.1, 12.2, 12.9 and 12.11 are captured responses. Replace `localhost:3000` and the ids with your own. The `data` field is shortened for readability.
 
 Set these once:
 
@@ -321,32 +466,32 @@ Response `201`:
 
 ```json
 {
-  "id": "7e1c8d65-0c51-4b3f-a7b8-123456789abc",
+  "id": "27876e54-2ff3-4bd7-9878-29a434e5993d",
   "title": "Project Notes",
-  "version": 1,
-  "device_id": "laptop-01",
   "subtitles": {
-    "5d0f3c0a-6b1e-4a52-9a43-0c6f5b7a1e21": {
-      "id": "5d0f3c0a-6b1e-4a52-9a43-0c6f5b7a1e21",
+    "952f9fe8-f304-4a5b-a452-1ae4883dfcb8": {
+      "id": "952f9fe8-f304-4a5b-a452-1ae4883dfcb8",
       "title": "Intro",
       "content": "v1",
       "version": 1,
-      "created_at": "2026-10-03T10:00:00.000Z",
-      "updated_at": "2026-10-03T10:00:00.000Z",
+      "created_at": "2026-10-03T13:26:23.013Z",
+      "updated_at": "2026-10-03T13:26:23.013Z",
       "last_modified_device_id": "laptop-01"
     }
   },
-  "created_at": "2026-10-03T10:00:00.000Z",
-  "updated_at": "2026-10-03T10:00:00.000Z",
-  "user_id": null
+  "created_at": "2026-10-03T13:26:23.013+00:00",
+  "updated_at": "2026-10-03T13:26:23.013+00:00",
+  "version": 1,
+  "user_id": null,
+  "device_id": "laptop-01"
 }
 ```
 
 Keep the notebook `id` and the subtitle id for the next requests:
 
 ```bash
-DOC=7e1c8d65-0c51-4b3f-a7b8-123456789abc
-SUB=5d0f3c0a-6b1e-4a52-9a43-0c6f5b7a1e21
+DOC=27876e54-2ff3-4bd7-9878-29a434e5993d
+SUB=952f9fe8-f304-4a5b-a452-1ae4883dfcb8
 ```
 
 ### 12.2 Clean update (accepted)
@@ -376,17 +521,36 @@ Response `200`:
 ```json
 {
   "message": "Merge completed successfully",
-  "documentId": "7e1c8d65-0c51-4b3f-a7b8-123456789abc",
+  "documentId": "27876e54-2ff3-4bd7-9878-29a434e5993d",
   "documentVersion": 2,
   "deviceId": "laptop-01",
   "added": [],
-  "updated": ["5d0f3c0a-6b1e-4a52-9a43-0c6f5b7a1e21"],
+  "updated": ["952f9fe8-f304-4a5b-a452-1ae4883dfcb8"],
   "unchanged": [],
   "conflicts": [],
   "documentConflicts": [],
-  "data": { "id": "7e1c8d65-0c51-4b3f-a7b8-123456789abc", "title": "Project Notes", "version": 2, "subtitles": { "...": "title is now Overview, subtitle version 2" } }
+  "data": {
+    "id": "27876e54-2ff3-4bd7-9878-29a434e5993d",
+    "title": "Project Notes",
+    "user_id": null,
+    "version": 2,
+    "device_id": "laptop-01",
+    "subtitles": {
+      "952f9fe8-f304-4a5b-a452-1ae4883dfcb8": {
+        "id": "952f9fe8-f304-4a5b-a452-1ae4883dfcb8",
+        "title": "Overview",
+        "content": "v1",
+        "version": 2,
+        "created_at": "2026-10-03T13:26:23.013Z",
+        "updated_at": "2026-10-03T13:34:12.982Z",
+        "last_modified_device_id": "laptop-01"
+      }
+    }
+  }
 }
 ```
+
+Screenshots: [request](docs/screenshots/03b-rename-body.png), [response](docs/screenshots/03d-rename-response.png).
 
 ### 12.3 Non-conflicting merge (scenario A)
 
@@ -415,21 +579,21 @@ Response `200`. The laptop's rename is **kept** and the phone's content is **add
 ```json
 {
   "message": "Merge completed successfully",
-  "documentId": "7e1c8d65-0c51-4b3f-a7b8-123456789abc",
+  "documentId": "27876e54-2ff3-4bd7-9878-29a434e5993d",
   "documentVersion": 3,
   "deviceId": "phone-01",
   "added": [],
-  "updated": ["5d0f3c0a-6b1e-4a52-9a43-0c6f5b7a1e21"],
+  "updated": ["952f9fe8-f304-4a5b-a452-1ae4883dfcb8"],
   "unchanged": [],
   "conflicts": [],
   "documentConflicts": [],
   "data": {
-    "id": "7e1c8d65-0c51-4b3f-a7b8-123456789abc",
+    "id": "27876e54-2ff3-4bd7-9878-29a434e5993d",
     "title": "Project Notes",
     "version": 3,
     "subtitles": {
-      "5d0f3c0a-6b1e-4a52-9a43-0c6f5b7a1e21": {
-        "id": "5d0f3c0a-6b1e-4a52-9a43-0c6f5b7a1e21",
+      "952f9fe8-f304-4a5b-a452-1ae4883dfcb8": {
+        "id": "952f9fe8-f304-4a5b-a452-1ae4883dfcb8",
         "title": "Overview",
         "content": "v2 from phone",
         "version": 3,
@@ -467,7 +631,7 @@ Response `200`. Nothing is overwritten; the conflict carries all three values:
 ```json
 {
   "message": "Merge completed with unresolved conflicts",
-  "documentId": "7e1c8d65-0c51-4b3f-a7b8-123456789abc",
+  "documentId": "27876e54-2ff3-4bd7-9878-29a434e5993d",
   "documentVersion": 3,
   "deviceId": "laptop-01",
   "added": [],
@@ -475,7 +639,7 @@ Response `200`. Nothing is overwritten; the conflict carries all three values:
   "unchanged": [],
   "conflicts": [
     {
-      "subtitleId": "5d0f3c0a-6b1e-4a52-9a43-0c6f5b7a1e21",
+      "subtitleId": "952f9fe8-f304-4a5b-a452-1ae4883dfcb8",
       "reason": "Concurrent edits to the same field",
       "currentVersion": 3,
       "baseVersion": 1,
@@ -596,14 +760,69 @@ curl $BASE/documents/$DOC
 curl $BASE/documents/$DOC/versions
 ```
 
+Real output after 12.1 and 12.2 (the notebook is at version 2). `GET /documents/:documentId` returns `200`:
+
+```json
+{
+  "message": "Current document version retrieved successfully",
+  "document": {
+    "id": "27876e54-2ff3-4bd7-9878-29a434e5993d",
+    "title": "Project Notes",
+    "subtitles": {
+      "952f9fe8-f304-4a5b-a452-1ae4883dfcb8": {
+        "id": "952f9fe8-f304-4a5b-a452-1ae4883dfcb8",
+        "title": "Overview",
+        "content": "v1",
+        "version": 2,
+        "created_at": "2026-10-03T13:26:23.013Z",
+        "updated_at": "2026-10-03T13:34:12.982Z",
+        "last_modified_device_id": "laptop-01"
+      }
+    },
+    "created_at": "2026-10-03T13:26:23.013+00:00",
+    "updated_at": "2026-10-03T13:34:12.982+00:00",
+    "version": 2,
+    "user_id": null,
+    "device_id": "laptop-01"
+  }
+}
+```
+
+`GET /documents/:documentId/versions` returns `200`, newest first. Version 1 keeps the original `Intro`:
+
 ```json
 {
   "message": "Document versions retrieved successfully",
-  "documentId": "7e1c8d65-0c51-4b3f-a7b8-123456789abc",
-  "totalVersions": 4,
-  "versions": [ { "version_number": 4, "...": "..." }, { "version_number": 3, "...": "..." } ]
+  "documentId": "27876e54-2ff3-4bd7-9878-29a434e5993d",
+  "totalVersions": 2,
+  "versions": [
+    {
+      "id": "a263ded3-edac-4954-91e6-7ce7ef574d71",
+      "document_id": "27876e54-2ff3-4bd7-9878-29a434e5993d",
+      "version_number": 2,
+      "title": "Project Notes",
+      "subtitles": {
+        "952f9fe8-f304-4a5b-a452-1ae4883dfcb8": { "title": "Overview", "content": "v1", "version": 2, "last_modified_device_id": "laptop-01", "...": "..." }
+      },
+      "created_at": "2026-10-03T13:34:12.529778+00:00",
+      "device_id": null
+    },
+    {
+      "id": "f96bb4b4-683f-428e-8b26-721747995273",
+      "document_id": "27876e54-2ff3-4bd7-9878-29a434e5993d",
+      "version_number": 1,
+      "title": "Project Notes",
+      "subtitles": {
+        "952f9fe8-f304-4a5b-a452-1ae4883dfcb8": { "title": "Intro", "content": "v1", "version": 1, "last_modified_device_id": "laptop-01", "...": "..." }
+      },
+      "created_at": "2026-10-03T13:26:22.962757+00:00",
+      "device_id": "laptop-01"
+    }
+  ]
 }
 ```
+
+Two things to notice: the snapshot written by the update has `"device_id": null` (listed in [section 15](#15-known-limitations); the subtitle inside it still records `laptop-01`), and after the whole walkthrough 12.1 to 12.7 `totalVersions` is 5. Screenshots: [get](docs/screenshots/04b-get-response.png), [history](docs/screenshots/05b-history-response-v2.png).
 
 ### 12.10 Error responses
 
@@ -618,6 +837,46 @@ curl $BASE/documents/$DOC/versions
 | Two saves race on the same notebook | `409` `Document was modified by another request. Fetch the latest version and retry.` |
 
 All errors use the standard shape `{ "message": ..., "error": ..., "statusCode": ... }`.
+
+### 12.11 Captured: change already applied
+
+The Step 2 rename sent again under a new `idempotency-key` (real response, `200`). Nothing is written and the version does not move:
+
+```json
+{
+  "message": "No changes required",
+  "documentId": "27876e54-2ff3-4bd7-9878-29a434e5993d",
+  "documentVersion": 2,
+  "deviceId": "laptop-01",
+  "added": [],
+  "updated": [],
+  "unchanged": ["952f9fe8-f304-4a5b-a452-1ae4883dfcb8"],
+  "conflicts": [],
+  "documentConflicts": [],
+  "data": {
+    "id": "27876e54-2ff3-4bd7-9878-29a434e5993d",
+    "title": "Project Notes",
+    "subtitles": {
+      "952f9fe8-f304-4a5b-a452-1ae4883dfcb8": {
+        "id": "952f9fe8-f304-4a5b-a452-1ae4883dfcb8",
+        "title": "Overview",
+        "content": "v1",
+        "version": 2,
+        "created_at": "2026-10-03T13:26:23.013Z",
+        "updated_at": "2026-10-03T13:34:12.982Z",
+        "last_modified_device_id": "laptop-01"
+      }
+    },
+    "created_at": "2026-10-03T13:26:23.013+00:00",
+    "updated_at": "2026-10-03T13:34:12.982+00:00",
+    "version": 2,
+    "user_id": null,
+    "device_id": "laptop-01"
+  }
+}
+```
+
+Screenshots: [request](docs/screenshots/06a-nochange-headers.png), [response](docs/screenshots/06c-nochange-response.png). The replay of a content edit (12.8) is captured in [08c-replay-response.png](docs/screenshots/08c-replay-response.png).
 
 ---
 
