@@ -19,6 +19,7 @@ import {
 } from '@nestjs/swagger';
 
 import { isUUID } from 'class-validator';
+
 import { DocumentCurrentVersionService } from './document.currentVersion.service.js';
 import { DocumentCreateService } from './docomument.create.service.js';
 import { DocumentMergeService } from './document.merge.service.js';
@@ -31,11 +32,11 @@ import { UpdateDocumentDto } from '../dto/update_document.dto.js';
 @Controller('documents')
 export class DocumentController {
   constructor(
-  private readonly documentCreateService: DocumentCreateService,
-  private readonly documentMergeService: DocumentMergeService,
-  private readonly documentHistoryService: DocumentHistoryService,
-  private readonly documentCurrentVersionService: DocumentCurrentVersionService,
-) {}
+    private readonly documentCreateService: DocumentCreateService,
+    private readonly documentMergeService: DocumentMergeService,
+    private readonly documentHistoryService: DocumentHistoryService,
+    private readonly documentCurrentVersionService: DocumentCurrentVersionService,
+  ) {}
 
   private validateRequestId(requestId: string): void {
     if (!requestId || !isUUID(requestId)) {
@@ -127,7 +128,7 @@ export class DocumentController {
   @ApiOperation({
     summary: 'Merge document changes',
     description:
-      'Merges changes from a device into the latest document version using field-level conflict detection.',
+      'Merges changes from a device into the latest document version using field-level conflict detection. A merge request can partially succeed: non-conflicting changes are saved while conflicting fields are reported in the response.',
   })
   @ApiBody({
     type: UpdateDocumentDto,
@@ -149,7 +150,7 @@ export class DocumentController {
   @ApiResponse({
     status: 200,
     description:
-      'Document changes merged successfully.',
+      'Request processed. Always check conflicts and documentConflicts. Non-conflicting changes are saved, while conflicting fields are left unchanged and returned for the client to resolve. The message may be "Merge completed successfully", "No changes required", "Merge completed with unresolved conflicts", or "Same request already processed" for a replay.',
   })
   @ApiResponse({
     status: 400,
@@ -158,16 +159,18 @@ export class DocumentController {
   })
   @ApiResponse({
     status: 404,
-    description: 'Document was not found.',
+    description:
+      'Document was not found.',
   })
   @ApiResponse({
     status: 409,
     description:
-      'Document was modified by another request or a merge conflict occurred.',
+      'Concurrent save detected, idempotency key was reused with a different request body, or the same request is still being processed.',
   })
   @ApiResponse({
     status: 500,
-    description: 'Internal server error.',
+    description:
+      'Internal server error.',
   })
   async merge(
     @Body() dto: UpdateDocumentDto,
@@ -183,45 +186,53 @@ export class DocumentController {
       deviceId,
     );
   }
-  //GETTING CURRENT DOCUMENT VERSION
-@Get(':documentId')
-@ApiOperation({
-  summary: 'Get current document version',
-  description:
-    'Returns the latest version of the document.',
-})
-@ApiResponse({
-  status: 200,
-  description: 'Current document version returned successfully.',
-})
-@ApiResponse({
-  status: 400,
-  description: 'Invalid document UUID.',
-})
-@ApiResponse({
-  status: 404,
-  description: 'Document was not found.',
-})
-@ApiResponse({
-  status: 500,
-  description: 'Internal server error.',
-})
-async getCurrentDocument(
-  @Param(
-    'documentId',
-    new ParseUUIDPipe(),
-  )
-  documentId: string,
-) {
-  return this.documentCurrentVersionService.getDocument(
-    documentId,
-  );
-}
+
+  // ---------------------------------------------------------
+  // GET CURRENT DOCUMENT VERSION
+  // ---------------------------------------------------------
+
+  @Get(':documentId')
+  @ApiOperation({
+    summary: 'Get current document version',
+    description:
+      'Returns the latest version of the document.',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Current document version returned successfully.',
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Invalid document UUID.',
+  })
+  @ApiResponse({
+    status: 404,
+    description:
+      'Document was not found.',
+  })
+  @ApiResponse({
+    status: 500,
+    description:
+      'Internal server error.',
+  })
+  async getCurrentDocument(
+    @Param(
+      'documentId',
+      new ParseUUIDPipe(),
+    )
+    documentId: string,
+  ) {
+    return this.documentCurrentVersionService.getDocument(
+      documentId,
+    );
+  }
+
   // ---------------------------------------------------------
   // GET DOCUMENT VERSION HISTORY
   // ---------------------------------------------------------
- 
-   
+
   @Get(':documentId/versions')
   @ApiOperation({
     summary: 'Get document version history',
@@ -235,11 +246,18 @@ async getCurrentDocument(
   })
   @ApiResponse({
     status: 400,
-    description: 'Invalid document UUID.',
+    description:
+      'Invalid document UUID.',
   })
   @ApiResponse({
     status: 404,
-    description: 'Document was not found.',
+    description:
+      'Document was not found.',
+  })
+  @ApiResponse({
+    status: 500,
+    description:
+      'Internal server error.',
   })
   async getDocumentVersions(
     @Param(
