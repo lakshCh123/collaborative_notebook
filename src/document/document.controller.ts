@@ -73,7 +73,6 @@ async merge(
 
     return this.documentHistoryService.getDocumentVersions(
       documentId,
-      requestId,
     );
   }
 }

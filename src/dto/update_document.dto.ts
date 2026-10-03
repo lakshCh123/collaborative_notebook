@@ -65,6 +65,9 @@ export class SubtitleDto {
 }
 
 export class UpdateDocumentDto {
+  @IsString()
+  @IsNotEmpty()
+  base_title!: string;
   @ApiProperty({
     description: 'Updated notebook title',
     example: 'My Collaborative Notebook',

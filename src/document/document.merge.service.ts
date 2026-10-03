@@ -81,7 +81,11 @@ export class DocumentMergeService {
         const conflicts: Array<Record<string, unknown>> = [];
 
         const now = new Date().toISOString();
-
+       if (dto.base_title !== existingDocument.title) {
+       throw new ConflictException(
+       'The document title was changed by another device. Fetch the latest title before updating.',
+       );
+        }
         for (const incoming of dto.subtitles) {
   const current = mergedSubtitles[incoming.id];
 

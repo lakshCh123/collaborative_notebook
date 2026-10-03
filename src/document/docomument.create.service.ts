@@ -25,13 +25,13 @@ export class DocumentCreateService {
     requestId: string,
     deviceId: string,
   ) {
-    const documentId = dto.uuid ?? randomUUID();
+    const documentId =  randomUUID();
 
     return this.idempotencyService.executeIdempotently(
-  requestId,
-  null,
-  deviceId,
-  dto,
+      requestId,
+      documentId,
+      deviceId,
+      dto,
       async () => {
         const now = new Date().toISOString();
 
@@ -81,6 +81,27 @@ export class DocumentCreateService {
           );
 
           throw new InternalServerErrorException(error.message);
+        }
+
+        const { error: historyError } =
+          await this.databaseService.supabase
+            .from('document_versions')
+            .insert({
+              document_id: data.id,
+              version_number: data.version,
+              title: data.title,
+              subtitles: data.subtitles,
+              device_id: deviceId,
+            });
+
+        if (historyError) {
+          this.logger.error(
+            `Failed to save initial document version: ${historyError.message}`,
+          );
+
+          throw new InternalServerErrorException(
+            'Document was created, but its initial version could not be saved',
+          );
         }
 
         return data;
