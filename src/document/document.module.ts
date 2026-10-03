@@ -7,6 +7,7 @@ import { DocumentCreateService } from './docomument.create.service.js';
 
 import { DatabaseModule } from '../database/database.module.js';
 import { IdempotencyModule } from '../idempotency/idempotency.module.js';
+import { DocumentCurrentVersionService } from './document.currentVersion.service.js';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { IdempotencyModule } from '../idempotency/idempotency.module.js';
   ],
   controllers: [DocumentController],
   providers: [
+    DocumentCurrentVersionService,
     DocumentCreateService,
     DocumentMergeService,
     DocumentHistoryService,

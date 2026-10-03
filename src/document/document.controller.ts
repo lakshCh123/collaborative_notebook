@@ -19,7 +19,7 @@ import {
 } from '@nestjs/swagger';
 
 import { isUUID } from 'class-validator';
-
+import { DocumentCurrentVersionService } from './document.currentVersion.service.js';
 import { DocumentCreateService } from './docomument.create.service.js';
 import { DocumentMergeService } from './document.merge.service.js';
 import { DocumentHistoryService } from './document.getDocumentVersions.service.js';
@@ -31,10 +31,11 @@ import { UpdateDocumentDto } from '../dto/update_document.dto.js';
 @Controller('documents')
 export class DocumentController {
   constructor(
-    private readonly documentCreateService: DocumentCreateService,
-    private readonly documentMergeService: DocumentMergeService,
-    private readonly documentHistoryService: DocumentHistoryService,
-  ) {}
+  private readonly documentCreateService: DocumentCreateService,
+  private readonly documentMergeService: DocumentMergeService,
+  private readonly documentHistoryService: DocumentHistoryService,
+  private readonly documentCurrentVersionService: DocumentCurrentVersionService,
+) {}
 
   private validateRequestId(requestId: string): void {
     if (!requestId || !isUUID(requestId)) {
@@ -182,11 +183,45 @@ export class DocumentController {
       deviceId,
     );
   }
-
+  //GETTING CURRENT DOCUMENT VERSION
+@Get(':documentId')
+@ApiOperation({
+  summary: 'Get current document version',
+  description:
+    'Returns the latest version of the document.',
+})
+@ApiResponse({
+  status: 200,
+  description: 'Current document version returned successfully.',
+})
+@ApiResponse({
+  status: 400,
+  description: 'Invalid document UUID.',
+})
+@ApiResponse({
+  status: 404,
+  description: 'Document was not found.',
+})
+@ApiResponse({
+  status: 500,
+  description: 'Internal server error.',
+})
+async getCurrentDocument(
+  @Param(
+    'documentId',
+    new ParseUUIDPipe(),
+  )
+  documentId: string,
+) {
+  return this.documentCurrentVersionService.getDocument(
+    documentId,
+  );
+}
   // ---------------------------------------------------------
   // GET DOCUMENT VERSION HISTORY
   // ---------------------------------------------------------
-
+ 
+   
   @Get(':documentId/versions')
   @ApiOperation({
     summary: 'Get document version history',
