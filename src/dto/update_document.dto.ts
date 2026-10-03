@@ -10,6 +10,7 @@ import {
 } from 'class-validator';
 
 import { Type } from 'class-transformer';
+
 import {
   ApiProperty,
   ApiPropertyOptional,
@@ -39,7 +40,8 @@ export class SubtitleDto {
   content!: string;
 
   @ApiProperty({
-    description: 'Version of the subtitle the client edited from',
+    description:
+      'Version of the subtitle that the client originally edited from',
     example: 2,
     minimum: 1,
   })
@@ -48,7 +50,8 @@ export class SubtitleDto {
   base_version!: number;
 
   @ApiPropertyOptional({
-    description: 'Original subtitle title before the client edit',
+    description:
+      'Original subtitle title before the client edit',
     example: 'Introduction',
   })
   @IsOptional()
@@ -56,7 +59,8 @@ export class SubtitleDto {
   base_title?: string;
 
   @ApiPropertyOptional({
-    description: 'Original subtitle content before the client edit',
+    description:
+      'Original subtitle content before the client edit',
     example: 'Original content',
   })
   @IsOptional()
@@ -65,9 +69,15 @@ export class SubtitleDto {
 }
 
 export class UpdateDocumentDto {
+  @ApiProperty({
+    description:
+      'Original notebook title that the client edited from. Used for three-way title conflict detection.',
+    example: 'My Notebook',
+  })
   @IsString()
   @IsNotEmpty()
   base_title!: string;
+
   @ApiProperty({
     description: 'Updated notebook title',
     example: 'My Collaborative Notebook',
@@ -77,7 +87,8 @@ export class UpdateDocumentDto {
   title!: string;
 
   @ApiProperty({
-    description: 'Subtitles included in the merge request',
+    description:
+      'Subtitles included in the merge request',
     type: () => SubtitleDto,
     isArray: true,
   })
@@ -87,7 +98,8 @@ export class UpdateDocumentDto {
   subtitles!: SubtitleDto[];
 
   @ApiProperty({
-    description: 'Notebook version the client is updating from',
+    description:
+      'Notebook version that the client is updating from',
     example: 3,
     minimum: 1,
   })
@@ -96,8 +108,10 @@ export class UpdateDocumentDto {
   version!: number;
 
   @ApiProperty({
-    description: 'UUID of the notebook being updated',
-    example: '7e1c8d65-0c51-4b3f-a7b8-123456789abc',
+    description:
+      'UUID of the notebook being updated',
+    example:
+      '7e1c8d65-0c51-4b3f-a7b8-123456789abc',
   })
   @IsUUID()
   uuid!: string;
