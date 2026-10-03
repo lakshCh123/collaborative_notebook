@@ -934,19 +934,3 @@ The container reads `.env` and serves on port 3000.
 - **Value-based, not arrival-based.** Nothing depends on the order requests reach the server, which is what makes out-of-order delivery safe.
 
 ---
-
-## 15. Known limitations
-
-These are listed so the behaviour is predictable.
-
-- **A sync with conflicts returns HTTP `200`.** There is no single `status` field. Clients must read `conflicts`, `documentConflicts`, `updated` and `added`.
-- **Merging is per field, not per character.** Two edits to different parts of the same `content` string are reported as a conflict.
-- **Subtitle ids are assigned by the server on create.** A device cannot pre-assign ids to subtitles it creates inside `POST /documents` (it can for new subtitles added through `PUT`).
-- **Create accepts optional `created_at`, `updated_at` and `version` per subtitle.** They should not be sent by clients; the merge path ignores client values.
-- **A request that failed with a server error cannot be retried with the same `idempotency-key`.** Use a new key.
-- **The same subtitle id twice in one `PUT` is not rejected.** The second entry is judged against the result of the first, so a client can conflict with itself.
-- **Version history snapshots written by updates do not record the device.** Snapshots written at create time do.
-- **Creating a notebook is two writes** (notebook, then its first history snapshot) and is not one atomic call.
-- **No delete and no restore.** A subtitle left out of a `PUT` is left unchanged.
-- **No authentication.** Anyone who knows a notebook id can read or change it. Enable row-level security on every table so the public Supabase key cannot reach them directly.
-- **Automated tests are not included yet.**
