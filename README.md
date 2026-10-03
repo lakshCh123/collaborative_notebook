@@ -24,7 +24,6 @@ Built for **GDG on Campus SRM Recruitments 2026-27, Backend Task 2: "Offline Syn
 12. [Example requests and responses](#12-example-requests-and-responses)
 13. [Setup and running](#13-setup-and-running)
 14. [Design decisions](#14-design-decisions)
-15. [Known limitations](#15-known-limitations)
 
 ---
 
