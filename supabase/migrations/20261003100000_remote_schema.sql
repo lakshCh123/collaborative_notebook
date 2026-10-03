@@ -23,47 +23,6 @@ COMMENT ON SCHEMA "public" IS 'standard public schema';
 
 
 
-CREATE OR REPLACE FUNCTION "public"."assign_document_version"() RETURNS "trigger"
-    LANGUAGE "plpgsql"
-    AS $$
-DECLARE
-    latest_version INTEGER;
-BEGIN
-    IF TG_OP = 'INSERT' THEN
-
-        SELECT MAX(version_number)
-        INTO latest_version
-        FROM document_versions
-        WHERE document_id = NEW.id;
-
-        NEW.version := COALESCE(latest_version, 0) + 1;
-
-    ELSIF TG_OP = 'UPDATE' THEN
-
-        IF NEW.title IS DISTINCT FROM OLD.title
-           OR NEW.subtitles IS DISTINCT FROM OLD.subtitles THEN
-
-            SELECT MAX(version_number)
-            INTO latest_version
-            FROM document_versions
-            WHERE document_id = NEW.id;
-
-            NEW.version := COALESCE(latest_version, 0) + 1;
-
-        ELSE
-            NEW.version := OLD.version;
-        END IF;
-
-    END IF;
-
-    RETURN NEW;
-END;
-$$;
-
-
-ALTER FUNCTION "public"."assign_document_version"() OWNER TO "postgres";
-
-
 CREATE OR REPLACE FUNCTION "public"."update_document_with_history"("p_document_id" "uuid", "p_expected_version" integer, "p_title" "text", "p_subtitles" "jsonb", "p_updated_at" timestamp with time zone) RETURNS "jsonb"
     LANGUAGE "plpgsql"
     AS $$
@@ -130,12 +89,12 @@ ALTER TABLE "public"."document_versions" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."documents" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "title" "text" NOT NULL,
-    "subtitles" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
+    "subtitles" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "version" integer DEFAULT 1 NOT NULL,
     "user_id" "uuid",
-    "device_id" "uuid",
+    "device_id" "text",
     CONSTRAINT "subtitles_must_be_object" CHECK (("jsonb_typeof"("subtitles") = 'object'::"text"))
 );
 
@@ -151,8 +110,8 @@ CREATE TABLE IF NOT EXISTS "public"."sync_requests" (
     "status" "text" DEFAULT 'completed'::"text" NOT NULL,
     "request_hash" "text",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "device_id" "uuid",
-    CONSTRAINT "sync_requests_status_check" CHECK (("status" = ANY (ARRAY['processing'::"text", 'completed'::"text"])))
+    "device_id" "text",
+    CONSTRAINT "sync_requests_status_check" CHECK (("status" = ANY (ARRAY['processing'::"text", 'completed'::"text", 'failed'::"text"])))
 );
 
 
@@ -181,11 +140,6 @@ ALTER TABLE ONLY "public"."document_versions"
 
 ALTER TABLE ONLY "public"."documents"
     ADD CONSTRAINT "documents_pkey" PRIMARY KEY ("id");
-
-
-
-ALTER TABLE ONLY "public"."documents"
-    ADD CONSTRAINT "documents_title_key" UNIQUE ("title");
 
 
 
@@ -223,6 +177,12 @@ ALTER TABLE ONLY "public"."sync_requests"
 
 
 
+ALTER TABLE "public"."document_versions" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."documents" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."sync_requests" ENABLE ROW LEVEL SECURITY;
 
 
@@ -230,12 +190,6 @@ GRANT USAGE ON SCHEMA "public" TO "postgres";
 GRANT USAGE ON SCHEMA "public" TO "anon";
 GRANT USAGE ON SCHEMA "public" TO "authenticated";
 GRANT USAGE ON SCHEMA "public" TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."assign_document_version"() TO "anon";
-GRANT ALL ON FUNCTION "public"."assign_document_version"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."assign_document_version"() TO "service_role";
 
 
 

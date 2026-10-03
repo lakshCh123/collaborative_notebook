@@ -5,7 +5,7 @@
 
 # TypeScript build cache
 *.tsbuildinfo
-
+docker.env
 # Logs
 logs
 *.log
@@ -44,7 +44,8 @@ lerna-debug.log*
 .env.test.local
 .env.production.local
 .env.local
-
+supabase/.branches/
+supabase/.temp/
 # temp directory
 .temp
 .tmp
