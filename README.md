@@ -263,7 +263,7 @@ collaborative_notebook/
 │   │   ├── document.currentVersion.service.ts      # get current notebook
 │   │   ├── document.getDocumentVersions.service.ts # version history
 │   │   └── document.module.ts
-│   ├── dto/                      # request validation (create and update)
+│   ├── dto/                      # request validation create and update
 │   └── idempotency/              # idempotency-key handling and body hash
 ├── supabase/
 │   └── migrations/               # tables and the atomic save function
