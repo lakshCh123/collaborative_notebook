@@ -15,7 +15,7 @@ This is my submission for GDG on Campus SRM Recruitments 2026-27, Backend Task 2
 
 ## 1. How synchronization works
 
-<<<<<<< HEAD
+HEAD
 A notebook has a title and a list of subtitles (sections). Each subtitle has a `title` and `content`. Devices keep their own copy, maybe while offline, and sync it with the server later.
 =======
 1. [Screenshots](#1-screenshots)
@@ -32,7 +32,6 @@ A notebook has a title and a list of subtitles (sections). Each subtitle has a `
 12. [Example requests and responses](#12-example-requests-and-responses)
 13. [Setup and running](#13-setup-and-running)
 14. [Design decisions](#14-design-decisions)
->>>>>>> 6c4be7bdc1bfa4e17afb9e8cf075fa46cadff53d
 
 1. A device creates a notebook with `POST /documents`.
 2. It keeps editing locally and remembers the values each edit started from.
