@@ -2,6 +2,67 @@
 
 This is my submission for GDG on Campus SRM Recruitments 2026-27, Backend Task 2 ("Offline Sync Conflict, When Devices Disagree"). It's a NestJS and Supabase (PostgreSQL) API that syncs edits to a shared notebook from several devices. When two devices change the same thing on their own, the server doesn't overwrite anything. It merges what can safely live together and reports the rest as a conflict.
 
+File structure -
+collaborative_notebook/
+├── README.md                  ← the new humanized one
+├── docs/
+│   └── screenshots/           ← every image the README links to (38 files)
+│       ├── 01-swagger.png
+│       ├── 01-swagger-history.png
+│       ├── 01-swagger-responses-schemas.png
+│       ├── 01-swagger-schemas.png
+│       ├── 02a-create-request.png
+│       ├── 02b-create-curl-and-201.png
+│       ├── 02c-create-response.png
+│       ├── 03a-rename-headers.png
+│       ├── 03b-rename-body.png
+│       ├── 03c-rename-curl.png
+│       ├── 03d-rename-response.png
+│       ├── 04a-get-request.png
+│       ├── 04b-get-response.png
+│       ├── 04c-get-headers.png
+│       ├── 05a-history-request.png
+│       ├── 05b-history-response-v2.png
+│       ├── 05c-history-response-v1.png
+│       ├── 05d-history-headers.png
+│       ├── 06a-nochange-headers.png
+│       ├── 06b-nochange-curl.png
+│       ├── 06c-nochange-response.png
+│       ├── 06d-nochange-response-end.png
+│       ├── 07a-update-headers.png
+│       ├── 07b-update-body.png
+│       ├── 07c-update-curl.png
+│       ├── 07d-update-response.png
+│       ├── 07e-update-status-codes.png
+│       ├── 08a-replay-headers.png
+│       ├── 08b-replay-body-curl.png
+│       ├── 08c-replay-response.png
+│       ├── 08d-replay-headers-status.png
+│       ├── 09a-stale-base-headers.png
+│       ├── 09b-stale-base-body.png
+│       ├── 09c-stale-base-curl.png
+│       ├── 09d-stale-base-response.png
+│       ├── 09e-stale-base-headers-status.png
+│       ├── 10-two-device-conflict.png
+│       └── 11-two-device-merge.png
+├── src/
+│   ├── main.ts
+│   ├── app.module.ts / app.controller.ts / app.service.ts
+│   ├── database/              (database.module.ts, database.service.ts)
+│   ├── document/              (controller, module, merge, create, current-version and versions services)
+│   ├── dto/                   (create_document.dto.ts, update_document.dto.ts)
+│   └── idempotency/           (idempotency.module.ts, idempotency.service.ts)
+├── supabase/migrations/
+├── public/images/             (shrek.jpg, which you can delete)
+├── Dockerfile
+├── docker-compose.yml
+├── package.json / package-lock.json
+├── tsconfig.json / tsconfig.build.json / nest-cli.json
+├── vitest.config.ts / vitest.config.e2e.ts
+├── oxlint.json / .prettierrc / .gitignore
+└── .env example
+
+
 ## Contents
 
 1. [How synchronization works](#1-how-synchronization-works)
