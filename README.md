@@ -15,7 +15,24 @@ This is my submission for GDG on Campus SRM Recruitments 2026-27, Backend Task 2
 
 ## 1. How synchronization works
 
+<<<<<<< HEAD
 A notebook has a title and a list of subtitles (sections). Each subtitle has a `title` and `content`. Devices keep their own copy, maybe while offline, and sync it with the server later.
+=======
+1. [Screenshots](#1-screenshots)
+2. [The idea in 30 seconds](#2-the-idea-in-30-seconds)
+3. [Task requirements and where they are implemented](#3-task-requirements-and-where-they-are-implemented)
+4. [Data model](#4-data-model)
+5. [How synchronization works](#5-how-synchronization-works)
+6. [How changes are tracked](#6-how-changes-are-tracked)
+7. [How conflicts are detected](#7-how-conflicts-are-detected)
+8. [Conflict-resolution strategy](#8-conflict-resolution-strategy)
+9. [Conflicting and non-conflicting scenarios](#9-conflicting-and-non-conflicting-scenarios)
+10. [Consistency and edge cases](#10-consistency-and-edge-cases)
+11. [API reference](#11-api-reference)
+12. [Example requests and responses](#12-example-requests-and-responses)
+13. [Setup and running](#13-setup-and-running)
+14. [Design decisions](#14-design-decisions)
+>>>>>>> 6c4be7bdc1bfa4e17afb9e8cf075fa46cadff53d
 
 1. A device creates a notebook with `POST /documents`.
 2. It keeps editing locally and remembers the values each edit started from.
