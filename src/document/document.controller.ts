@@ -59,10 +59,7 @@ export class DocumentController {
       );
     }
   }
-
-  // ---------------------------------------------------------
-  // CREATE DOCUMENT
-  // ---------------------------------------------------------
+//creation of document
 
   @Post()
   @ApiOperation({
@@ -120,9 +117,7 @@ export class DocumentController {
     );
   }
 
-  // ---------------------------------------------------------
-  // MERGE / UPDATE DOCUMENT
-  // ---------------------------------------------------------
+ //merge or updatiion of document
 
   @Put()
   @ApiOperation({
@@ -187,9 +182,7 @@ export class DocumentController {
     );
   }
 
-  // ---------------------------------------------------------
-  // GET CURRENT DOCUMENT VERSION
-  // ---------------------------------------------------------
+  //curretn document version
 
   @Get(':documentId')
   @ApiOperation({
@@ -228,11 +221,7 @@ export class DocumentController {
       documentId,
     );
   }
-
-  // ---------------------------------------------------------
-  // GET DOCUMENT VERSION HISTORY
-  // ---------------------------------------------------------
-
+//document version history
   @Get(':documentId/versions')
   @ApiOperation({
     summary: 'Get document version history',

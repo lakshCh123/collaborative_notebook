@@ -14,7 +14,7 @@ interface StoredSubtitle {
   id: string;
   title: string;
   content: string;
-  created_at: string;
+  created_at: string;//what the subtitle content will follow
   updated_at: string;
   version: number;
   last_modified_device_id?: string;
@@ -24,11 +24,11 @@ type NotebookSubtitles = Record<string, StoredSubtitle>;
 
 @Injectable()
 export class DocumentMergeService {
-  private readonly logger = new Logger(DocumentMergeService.name);
+  private readonly logger = new Logger(DocumentMergeService.name);//for logging the service
 
   constructor(
     private readonly databaseService: DatabaseService,
-    private readonly idempotencyService: IdempotencyService,
+    private readonly idempotencyService: IdempotencyService,//injecting the database service and idempotency service
   ) {}
 
   async merge(
@@ -84,10 +84,7 @@ export class DocumentMergeService {
 
         const now = new Date().toISOString();
 
-        // --------------------------------------------------
-        // DOCUMENT TITLE THREE-WAY MERGE
-        // --------------------------------------------------
-
+//document level three way merge
         const incomingTitle = dto.title.trim();
         const baseTitle = dto.base_title.trim();
 
@@ -113,10 +110,7 @@ export class DocumentMergeService {
           }
         }
 
-        // --------------------------------------------------
-        // SUBTITLE MERGE
-        // --------------------------------------------------
-
+//subtitle level three way merge
         for (const incoming of dto.subtitles) {
           const current = mergedSubtitles[incoming.id];
 
@@ -250,10 +244,7 @@ export class DocumentMergeService {
 
           updated.push(incoming.id);
         }
-
-        // --------------------------------------------------
-        // CHECK WHETHER ANYTHING ACTUALLY CHANGED
-        // --------------------------------------------------
+//if any real changes has happened 
 
         const titleChanged =
           nextTitle !== existingDocument.title;
@@ -263,10 +254,7 @@ export class DocumentMergeService {
           updated.length > 0 ||
           titleChanged;
 
-        // --------------------------------------------------
-        // NO CHANGES
-        // --------------------------------------------------
-
+// no changes has happened but there are conflicts so we return the conflicts without saving anything
         if (!hasChanges) {
           const hasConflicts =
             conflicts.length > 0 ||
@@ -295,10 +283,7 @@ export class DocumentMergeService {
           };
         }
 
-        // --------------------------------------------------
-        // SAVE DOCUMENT + HISTORY
-        // --------------------------------------------------
-
+//saving document history + versioning + updating the document with new changes
         const nextDocumentVersion =
           (existingDocument.version ?? 1) + 1;
 
@@ -330,11 +315,7 @@ export class DocumentMergeService {
             'Failed to save document and version history',
           );
         }
-
-        // --------------------------------------------------
-        // RESPONSE
-        // --------------------------------------------------
-
+//response to the client with the result of the merge operation including any conflicts and the updated document data
         const hasConflicts =
           conflicts.length > 0 ||
           documentConflicts.length > 0;

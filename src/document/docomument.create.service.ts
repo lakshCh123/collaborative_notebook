@@ -25,19 +25,19 @@ export class DocumentCreateService {
     requestId: string,
     deviceId: string,
   ) {
-    const documentId =  randomUUID();
+    const documentId =  randomUUID();// i will assign unique id for the creation document
 
-    return this.idempotencyService.executeIdempotently(
+    return this.idempotencyService.executeIdempotently(//running throught the idempotency
       requestId,
       documentId,
       deviceId,
       dto,
       async () => {
-        const now = new Date().toISOString();
+        const now = new Date().toISOString(); //assigning the current time to the doc
 
         const subtitles = Object.fromEntries(
           dto.subtitles.map((subtitle) => {
-            const subtitleId = randomUUID();
+            const subtitleId = randomUUID();//repetition of the logic
 
             return [
               subtitleId,
@@ -95,7 +95,7 @@ export class DocumentCreateService {
             });
 
         if (historyError) {
-          this.logger.error(
+          this.logger.error(//this error checker is basically if lets say documents is uplaoded and historyu is not updated
             `Failed to save initial document version: ${historyError.message}`,
           );
 

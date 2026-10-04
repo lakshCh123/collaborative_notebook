@@ -41,7 +41,7 @@ export class DocumentHistoryService {
       );
     }
 
-    // Fetch all previous versions of the document
+    // fetch all previous versions of the document
     const { data: versions, error: versionsError } =
       await this.databaseService.supabase
         .from('document_versions')

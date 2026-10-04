@@ -11,16 +11,16 @@ import { DatabaseService } from '../database/database.service.js';
 
 @Injectable()
 export class IdempotencyService {
-  private readonly logger = new Logger(IdempotencyService.name);
+  private readonly logger = new Logger(IdempotencyService.name);//logger for the service
 
   constructor(
     private readonly databaseService: DatabaseService,
-  ) {}
+  ) {} //injecting the database service
 
   private generateRequestHash(payload: unknown): string {
     return createHash('sha256')
       .update(JSON.stringify(payload))
-      .digest('hex');
+      .digest('hex');//converting to hash to store the key
   }
 
   async executeIdempotently<T>(
@@ -37,10 +37,10 @@ export class IdempotencyService {
         .from('sync_requests')
         .select('*')
         .eq('request_id', requestId)
-        .maybeSingle();
+        .maybeSingle();//checking for the key
 
     if (searchError) {
-      throw new InternalServerErrorException(searchError.message);
+      throw new InternalServerErrorException(searchError.message);//if error occurs while searchign
     }
 
     if (existingRequest) {
@@ -87,17 +87,17 @@ export class IdempotencyService {
         );
       }
 
-      throw new InternalServerErrorException(insertError.message);
+      throw new InternalServerErrorException(insertError.message);//if any internal error
     }
 
     try {
-      const result = await operation();
+      const result = await operation(); //this will wait for my main opertaion
 
       const resultDocumentId =
         result !== null &&
         typeof result === 'object' &&
         'id' in result &&
-        typeof result.id === 'string'
+        typeof result.id === 'string'//edge checks basic result not null and stuff
           ? result.id
           : documentId;
 
@@ -106,9 +106,9 @@ export class IdempotencyService {
           .from('sync_requests')
           .update({
             document_id: resultDocumentId,
-            response: result,
+            response: result,//storing the result in the response
             status: 'completed',
-            processed_at: new Date().toISOString(),
+            processed_at: new Date().toISOString(),//assigning the processed time
           })
           .eq('request_id', requestId);
 
