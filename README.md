@@ -13,7 +13,7 @@ This is my submission for GDG on Campus SRM Recruitments 2026-27, Backend Task 2
 7. [Project structure](#7-project-structure)
 
 ---
-
+Note- deployed on render https://collaborative-notebook.onrender.com/
 ## 1. How synchronization works
 
 A notebook has a title and a list of subtitles (sections). Each subtitle has a `title` and `content`. Devices keep their own copy, maybe while offline, and sync it with the server later.
