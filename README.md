@@ -2,67 +2,6 @@
 
 This is my submission for GDG on Campus SRM Recruitments 2026-27, Backend Task 2 ("Offline Sync Conflict, When Devices Disagree"). It's a NestJS and Supabase (PostgreSQL) API that syncs edits to a shared notebook from several devices. When two devices change the same thing on their own, the server doesn't overwrite anything. It merges what can safely live together and reports the rest as a conflict.
 
-File structure -
-collaborative_notebook/
-├── README.md                  ← the new humanized one
-├── docs/
-│   └── screenshots/           ← every image the README links to (38 files)
-│       ├── 01-swagger.png
-│       ├── 01-swagger-history.png
-│       ├── 01-swagger-responses-schemas.png
-│       ├── 01-swagger-schemas.png
-│       ├── 02a-create-request.png
-│       ├── 02b-create-curl-and-201.png
-│       ├── 02c-create-response.png
-│       ├── 03a-rename-headers.png
-│       ├── 03b-rename-body.png
-│       ├── 03c-rename-curl.png
-│       ├── 03d-rename-response.png
-│       ├── 04a-get-request.png
-│       ├── 04b-get-response.png
-│       ├── 04c-get-headers.png
-│       ├── 05a-history-request.png
-│       ├── 05b-history-response-v2.png
-│       ├── 05c-history-response-v1.png
-│       ├── 05d-history-headers.png
-│       ├── 06a-nochange-headers.png
-│       ├── 06b-nochange-curl.png
-│       ├── 06c-nochange-response.png
-│       ├── 06d-nochange-response-end.png
-│       ├── 07a-update-headers.png
-│       ├── 07b-update-body.png
-│       ├── 07c-update-curl.png
-│       ├── 07d-update-response.png
-│       ├── 07e-update-status-codes.png
-│       ├── 08a-replay-headers.png
-│       ├── 08b-replay-body-curl.png
-│       ├── 08c-replay-response.png
-│       ├── 08d-replay-headers-status.png
-│       ├── 09a-stale-base-headers.png
-│       ├── 09b-stale-base-body.png
-│       ├── 09c-stale-base-curl.png
-│       ├── 09d-stale-base-response.png
-│       ├── 09e-stale-base-headers-status.png
-│       ├── 10-two-device-conflict.png
-│       └── 11-two-device-merge.png
-├── src/
-│   ├── main.ts
-│   ├── app.module.ts / app.controller.ts / app.service.ts
-│   ├── database/              (database.module.ts, database.service.ts)
-│   ├── document/              (controller, module, merge, create, current-version and versions services)
-│   ├── dto/                   (create_document.dto.ts, update_document.dto.ts)
-│   └── idempotency/           (idempotency.module.ts, idempotency.service.ts)
-├── supabase/migrations/
-├── public/images/             (shrek.jpg, which you can delete)
-├── Dockerfile
-├── docker-compose.yml
-├── package.json / package-lock.json
-├── tsconfig.json / tsconfig.build.json / nest-cli.json
-├── vitest.config.ts / vitest.config.e2e.ts
-├── oxlint.json / .prettierrc / .gitignore
-└── .env example
-
-
 ## Contents
 
 1. [How synchronization works](#1-how-synchronization-works)
@@ -71,28 +10,13 @@ collaborative_notebook/
 4. [Conflict-resolution strategy](#4-conflict-resolution-strategy)
 5. [Conflicting and non-conflicting scenarios](#5-conflicting-and-non-conflicting-scenarios)
 6. [Example API requests and responses](#6-example-api-requests-and-responses)
+7. [Project structure](#7-project-structure)
 
 ---
 
 ## 1. How synchronization works
 
-HEAD
 A notebook has a title and a list of subtitles (sections). Each subtitle has a `title` and `content`. Devices keep their own copy, maybe while offline, and sync it with the server later.
-=======
-1. [Screenshots](#1-screenshots)
-2. [The idea in 30 seconds](#2-the-idea-in-30-seconds)
-3. [Task requirements and where they are implemented](#3-task-requirements-and-where-they-are-implemented)
-4. [Data model](#4-data-model)
-5. [How synchronization works](#5-how-synchronization-works)
-6. [How changes are tracked](#6-how-changes-are-tracked)
-7. [How conflicts are detected](#7-how-conflicts-are-detected)
-8. [Conflict-resolution strategy](#8-conflict-resolution-strategy)
-9. [Conflicting and non-conflicting scenarios](#9-conflicting-and-non-conflicting-scenarios)
-10. [Consistency and edge cases](#10-consistency-and-edge-cases)
-11. [API reference](#11-api-reference)
-12. [Example requests and responses](#12-example-requests-and-responses)
-13. [Setup and running](#13-setup-and-running)
-14. [Design decisions](#14-design-decisions)
 
 1. A device creates a notebook with `POST /documents`.
 2. It keeps editing locally and remembers the values each edit started from.
@@ -318,3 +242,33 @@ The phone starts from the original `Intro / v1` state while the laptop already h
 The phone changes the notebook title and leaves its subtitle values at their original base. The server applies the title change and keeps the laptop's subtitle edit.
 
 ![Two-device merge](docs/screenshots/11-two-device-merge.png)
+
+---
+
+## 7. Project structure
+
+```
+collaborative_notebook/
+├── README.md
+├── docs/
+│   └── screenshots/              # Swagger screenshots used in section 6
+├── src/
+│   ├── main.ts                   # app bootstrap, validation pipe, Swagger setup
+│   ├── app.module.ts
+│   ├── database/                 # Supabase client
+│   ├── document/
+│   │   ├── document.controller.ts                  # POST/PUT/GET routes
+│   │   ├── document.merge.service.ts               # three-way, field-level merge
+│   │   ├── docomument.create.service.ts            # create a notebook
+│   │   ├── document.currentVersion.service.ts      # get current notebook
+│   │   ├── document.getDocumentVersions.service.ts # version history
+│   │   └── document.module.ts
+│   ├── dto/                      # request validation (create and update)
+│   └── idempotency/              # idempotency-key handling and body hash
+├── supabase/
+│   └── migrations/               # tables and the atomic save function
+├── Dockerfile
+├── docker-compose.yml
+├── package.json
+└── .env.example
+```
