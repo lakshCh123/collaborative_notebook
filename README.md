@@ -1,6 +1,5 @@
 # Collaborative Notebook: Offline Sync Conflict
-
-This is my submission for GDG on Campus SRM Recruitments 2026-27, Backend Task 2 ("Offline Sync Conflict, When Devices Disagree"). It's a NestJS and Supabase (PostgreSQL) API that syncs edits to a shared notebook from several devices. When two devices change the same thing on their own, the server doesn't overwrite anything. It merges what can safely live together and reports the rest as a conflict.
+It's a NestJS and Supabase (PostgreSQL) API that syncs edits to a shared notebook from several devices. When two devices change the same thing on their own, the server doesn't overwrite anything. It merges what can safely live together and reports the rest as a conflict.
 
 ## Contents
 
